@@ -1,0 +1,10 @@
+pokedexcli
+
+# Ignore all executables in the project root
+*.exe
+*.out
+*.app
+
+# Ignore build output directories
+/bin/
+/build/
