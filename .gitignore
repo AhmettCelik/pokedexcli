@@ -1,4 +1,5 @@
 pokedexcli
+repl.log
 
 # Ignore all executables in the project root
 *.exe
