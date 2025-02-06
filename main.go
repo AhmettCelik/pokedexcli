@@ -7,14 +7,22 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 )
 
 type config struct {
-	results  []string
 	next     string
 	previous string
+}
+
+type locationAreaResponse struct {
+	Count    int    `json:"count"`
+	Next     string `json:"next"`
+	Previous string `json:"previous"`
+	Areas    []struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"results"`
 }
 
 type cliCommand struct {
@@ -55,21 +63,12 @@ func main() {
 	}
 
 	commandMap := func(c *config) error {
-		url := "https://pokeapi.co/api/v2/location-area/"
-		c.previous = c.next
-		if c.next == "" {
-			c.next = "1/"
-		} else {
-			numStr := strings.TrimRight(c.next, "/")
-			num, err := strconv.Atoi(numStr)
-			if err != nil {
-				return err
-			}
-			num++
-			c.next = fmt.Sprintf("%d/", num)
+		url := c.next
+		if url == "" {
+			url = "https://pokeapi.co/api/v2/location-area/"
 		}
 
-		res, err := http.Get(url + c.next)
+		res, err := http.Get(url)
 		if err != nil {
 			fmt.Println("Error getting response: ", err)
 			return err
@@ -86,12 +85,21 @@ func main() {
 			return fmt.Errorf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
 		}
 
-		err = json.Unmarshal(body, c)
+		locationAreaResponse := locationAreaResponse{}
+		err = json.Unmarshal(body, &locationAreaResponse)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(c)
+		fmt.Println()
+		for _, area := range locationAreaResponse.Areas {
+			fmt.Println(area.Name)
+		}
+		fmt.Println()
+
+		c.next = locationAreaResponse.Next
+		c.previous = locationAreaResponse.Previous
+
 		return nil
 	}
 
@@ -113,6 +121,8 @@ func main() {
 		callback:    commandMap,
 	}
 
+	c := config{}
+
 	for {
 		fmt.Print("Pokedex > ")
 		scanner.Scan()
@@ -120,7 +130,6 @@ func main() {
 		words := cleanInput(input)
 		if len(words) == 1 {
 			cmd, exists := commands[words[0]]
-			c := config{}
 			if exists {
 				cmd.callback(&c)
 			} else {
