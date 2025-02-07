@@ -41,6 +41,26 @@ func cleanInput(text string) []string {
 	return words
 }
 
+func (c *config) printAreaNames(data []byte) error {
+	locationAreaResponse := locationAreaResponse{}
+
+	err := json.Unmarshal(data, &locationAreaResponse)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println()
+	for _, area := range locationAreaResponse.Areas {
+		fmt.Println(area.Name)
+	}
+	fmt.Println()
+
+	c.next = locationAreaResponse.Next
+	c.previous = locationAreaResponse.Previous
+
+	return nil
+}
+
 var pokeCache *pokecache.Cache
 
 func main() {
@@ -74,6 +94,11 @@ func main() {
 			url = "https://pokeapi.co/api/v2/location-area/"
 		}
 
+		if cachedData, ok := pokeCache.Get(url); ok {
+			err := c.printAreaNames(cachedData)
+			return err
+		}
+
 		res, err := http.Get(url)
 		if err != nil {
 			fmt.Println("Error getting response: ", err)
@@ -91,20 +116,9 @@ func main() {
 			return fmt.Errorf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
 		}
 
-		locationAreaResponse := locationAreaResponse{}
-		err = json.Unmarshal(body, &locationAreaResponse)
-		if err != nil {
-			return err
-		}
+		pokeCache.Add(url, body)
 
-		fmt.Println()
-		for _, area := range locationAreaResponse.Areas {
-			fmt.Println(area.Name)
-		}
-		fmt.Println()
-
-		c.next = locationAreaResponse.Next
-		c.previous = locationAreaResponse.Previous
+		c.printAreaNames(body)
 
 		return nil
 	}
