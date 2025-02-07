@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/AhmettCelik/pokedexcli/internal/pokecache"
 )
 
 type config struct {
@@ -38,7 +41,10 @@ func cleanInput(text string) []string {
 	return words
 }
 
+var pokeCache *pokecache.Cache
+
 func main() {
+	pokeCache = pokecache.NewCache(5 * time.Minute)
 	scanner := bufio.NewScanner(os.Stdin)
 	commands := map[string]cliCommand{}
 
