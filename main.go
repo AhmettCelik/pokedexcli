@@ -28,10 +28,20 @@ type locationAreaResponse struct {
 	} `json:"results"`
 }
 
+type specificLocationAreaResponse struct {
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	PokemonEncounters []struct {
+		Pokemon struct {
+			Name string `json:"name"`
+		} `json:"pokemon"`
+	} `json:"pokemon_encounters"`
+}
+
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(c *config) error
+	callback    func(c *config, name string) error
 }
 
 func cleanInput(text string) []string {
@@ -61,6 +71,23 @@ func (c *config) printAreaNames(data []byte) error {
 	return nil
 }
 
+func (c *config) printPokemonNames(data []byte) error {
+	specificLocationAreaResponse := specificLocationAreaResponse{}
+
+	err := json.Unmarshal(data, &specificLocationAreaResponse)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println()
+	for _, pokemonEncounter := range specificLocationAreaResponse.PokemonEncounters {
+		fmt.Println(pokemonEncounter.Pokemon.Name)
+	}
+	fmt.Println()
+
+	return nil
+}
+
 var pokeCache *pokecache.Cache
 
 func main() {
@@ -68,14 +95,14 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 	commands := map[string]cliCommand{}
 
-	commandExit := func(c *config) error {
+	commandExit := func(c *config, name string) error {
 		fmt.Println("")
 		fmt.Println("Closing the Pokedex... Goodbye!")
 		os.Exit(0)
 		return nil
 	}
 
-	commandHelp := func(c *config) error {
+	commandHelp := func(c *config, name string) error {
 		if len(commands) == 0 {
 			return fmt.Errorf("There are no commands founds available")
 		}
@@ -88,7 +115,7 @@ func main() {
 		return nil
 	}
 
-	commandMap := func(c *config) error {
+	commandMap := func(c *config, name string) error {
 		url := c.next
 		if url == "" {
 			url = "https://pokeapi.co/api/v2/location-area/"
@@ -123,6 +150,36 @@ func main() {
 		return nil
 	}
 
+	commandExplore := func(c *config, name string) error {
+		url := "https://pokeapi.co/api/v2/location-area/" + name
+
+		if cachedData, ok := pokeCache.Get(url); ok {
+			c.printPokemonNames(cachedData)
+			return nil
+		}
+
+		res, err := http.Get(url)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return err
+		}
+
+		if res.StatusCode > 299 {
+			return fmt.Errorf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+		}
+
+		pokeCache.Add(url, body)
+
+		c.printPokemonNames(body)
+
+		return nil
+	}
+
 	commands["exit"] = cliCommand{
 		name:        "exit",
 		description: "Exit the Pokedex",
@@ -137,8 +194,14 @@ func main() {
 
 	commands["map"] = cliCommand{
 		name:        "map",
-		description: "Displays a help message",
+		description: "Displays location areas",
 		callback:    commandMap,
+	}
+
+	commands["explore"] = cliCommand{
+		name:        "explore",
+		description: "Displays a list of all the Pokemon located there",
+		callback:    commandExplore,
 	}
 
 	c := config{}
@@ -150,11 +213,23 @@ func main() {
 		words := cleanInput(input)
 		if len(words) == 1 {
 			cmd, exists := commands[words[0]]
-			if exists {
-				cmd.callback(&c)
-			} else {
+
+			if !exists {
 				fmt.Println("Unknown command")
+				return
 			}
+
+			cmd.callback(&c, "")
+		} else {
+			cmd, exists := commands[words[0]]
+			args := words[1:]
+
+			if !exists {
+				fmt.Println("Unknown command")
+				return
+			}
+
+			cmd.callback(&c, args[0])
 		}
 	}
 }
