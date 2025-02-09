@@ -298,6 +298,16 @@ func main() {
 		return nil
 	}
 
+	commandPokedex := func(c *config, name string) error {
+		userPokedex := user.Pokedex
+		for key := range userPokedex {
+			fmt.Println()
+			fmt.Printf("    - %s", key)
+		}
+		fmt.Println()
+		return nil
+	}
+
 	commands["exit"] = cliCommand{
 		name:        "exit",
 		description: "Exit the Pokedex",
@@ -332,6 +342,12 @@ func main() {
 		name:        "inspect",
 		description: "Inspect one of your pokemons details",
 		callback:    commandInspect,
+	}
+
+	commands["pokedex"] = cliCommand{
+		name:        "pokedex",
+		description: "See your all pokemon names",
+		callback:    commandPokedex,
 	}
 
 	c := config{}
